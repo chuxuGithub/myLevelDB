@@ -108,7 +108,18 @@ namespace leveldb{
                     assert(num_restarts_ > 0);
                 }
 
-            virtual bool Valid ()const (return current_)
+            virtual bool Valid ()const {return current_ < restarts_;}
 
+            virtual Status status()const{return status_;}
+
+            virtual Slice Key()const{
+                assert(Valid());
+                return key_;
+            }
+
+            virtual Slice Value()const{
+                assert(Valid());
+                return value_;
+            }
     };
 }
