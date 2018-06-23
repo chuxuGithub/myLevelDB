@@ -121,5 +121,32 @@ namespace leveldb{
                 assert(Valid());
                 return value_;
             }
+
+            virtual void Next(){
+                assert(Valid());
+                ParseNextKey();
+            }
+
+            virtual void Prev(){
+                assert(Valid())
+                const uint32_t original = current_;
+                while(GetRestartPoint(restart_index_) >= original){
+                    if(resize_index_ == 0){
+                        current_ = restarts_;
+                        restarts_index_ = num_restarts_;
+                        return;
+                    }
+                    restart_index_--;
+                }
+
+                SeekToRestartPoint(restart_index_);
+                do{
+                    
+                }while(ParseNextKey() && NextEntryOffset()<original);
+                
+            }
+
+            virtual void Seek(const Slice& target){
+            }
     };
 }
