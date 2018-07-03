@@ -147,6 +147,93 @@ namespace leveldb{
             }
 
             virtual void Seek(const Slice& target){
+                uint32_t left = 0;
+                uint32_t right = num_restarts_ - 1;
+                while(left < right){
+                    uint32_t mid = (left+right+1)/2;
+                    uint32_t region_offset = GetRestartPoint(mid);
+                    uint32_t shared,non_shared,value_length;
+                    const char* key_ptr = DecodeEntry(data_+region_offset,data_+restarts_,&shared,&non_shared,&value_length);
+                    if(key_ptr ==nullptr || shared!=0){
+                        CorruptionError();
+                        return;
+                    }
+                    Slice mid_key(key_ptr,non_shared);
+                    if(Compare(mid_ke,target) < 0){
+                        left = mid;
+
+                    }else{
+                        right = mid-1;
+                    }
+
+                    SeekToRestartPoint(left);
+                    while(true){
+                        if(!ParseNextKey()){
+                            return;
+                        }
+                        if(Compare(key_,target)>=0){
+                            return;
+                        }
+                    }
+                }
+
+                virtual void SeekToFirst(){
+                    SeekToRestartPoint(0);
+                    ParseNextKey();
+                }
+
+                virtual void SeekToLast(){
+                    SeekToRestartPoint(num_restarts_-1);
+                    while(ParseNextKey()&&NextEntryOffset()<restarts_){
+
+                    }
+                }
+
+                private:
+                void CorruptionError(){
+                    current_ = restarts_;
+                    restart_index_ = num_restarts_;
+                    status = Status::CorruptionError("bad entry in block");
+                    key_.clear();
+                    value_.clear();
+                }
+
+                bool ParseNextKey(){
+                    current_ = NextEntryOffset();
+                    const char* p =data_ + restarts_;
+                    if(p>=limit){
+                        current_ = restarts_;
+                        restart_index_ = num_restarts_;
+                        return false;
+                    }
+
+                    uint32_t shared,non_shared,value_length;
+                    p = DecodeEntry(p,limit,&shared,&non_shared,&value_length);
+                    if(p==nullptr || key_size()<shared){
+                        CorruptionError();
+                        return false;
+                    }else{
+                        key_.resize(shared);
+                        key_.append(p,non_shared);
+                        value_ = Slice(p+non_shared,value_length);
+                        while(restart_index_+1<num_restarts_&&GetRestartPoint(restart_index+1)<current_){
+                            ++restart_index;
+                        }
+                        return true;
+                    }
+                }
+            }
+
+            Iterator* Block::NewIterator(const Comparator* cmp){
+                if(size_ < sizeof(uint32_t)){
+                    return NewErrorIterator(Status::CorruptionError("bad block contents"));
+                    const uint32_t num_restarts = NumRestarts();
+                    if(num_restarts == 0){
+                        return NewEmptyIterator();
+                    }else{
+                        return new Iter(cmp,data_,restart_offset_,num_restarts);
+                    }
+                }
             }
     };
 }
